@@ -21,30 +21,39 @@ if(NOT DEFINED SystemC_FIND_QUIET AND NOT DEFINED ENV{SYSTEMC_HOME})
 endif()
 
 set(SYSTEMC_HOME $ENV{SYSTEMC_HOME})
-find_path(SYSTEMC_INCLUDE_DIR NAMES systemc
-          HINTS ${SYSTEMC_HOME}/include)
 
-if(DEFINED ENV{TARGET_ARCH})
-    set(SYSTEMC_TARGET_ARCH $ENV{TARGET_ARCH})
-elseif(DEFINED TARGET_ARCH)
-    set(SYSTEMC_TARGET_ARCH ${TARGET_ARCH})
-else()
-    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-        set(SYSTEMC_TARGET_ARCH "linux64")
+
+IF (APPLE)
+    set(SYSTEMC_INCLUDE_DIR ${SYSTEMC_HOME}/include)
+    find_library(SYSTEMC_LIBRARY systemc ${SYSTEMC_HOME}/lib)
+ELSEIF (UNIX)
+    find_path(SYSTEMC_INCLUDE_DIR NAMES systemc
+            HINTS ${SYSTEMC_HOME}/include)
+
+    if(DEFINED ENV{TARGET_ARCH})
+        set(SYSTEMC_TARGET_ARCH $ENV{TARGET_ARCH})
+    elseif(DEFINED TARGET_ARCH)
+        set(SYSTEMC_TARGET_ARCH ${TARGET_ARCH})
     else()
-        set(SYSTEMC_TARGET_ARCH "linux")
+        if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+            set(SYSTEMC_TARGET_ARCH "linux64")
+        else()
+            set(SYSTEMC_TARGET_ARCH "linux")
+        endif()
+        if (NOT DEFINED SystemC_FIND_QUIET)
+            message(WARNING "TARGET_ARCH not defined, guessing "
+                    \"${SYSTEMC_TARGET_ARCH}\")
+        endif()
     endif()
-    if (NOT DEFINED SystemC_FIND_QUIET)
-        message(WARNING "TARGET_ARCH not defined, guessing "
-                \"${SYSTEMC_TARGET_ARCH}\")
-    endif()
-endif()
 
-find_library(SYSTEMC_LIBRARY NAMES libsystemc.a systemc libSnpsVP.so
-             HINTS ${SYSTEMC_HOME}/lib-${SYSTEMC_TARGET_ARCH}
-                   ${SYSTEMC_HOME}/lib
-                   ${SYSTEMC_HOME}/libso-gcc-6.2.0-64
-                   ${SYSTEMC_HOME}/libso-gcc-5.2.0-64)
+    find_library(SYSTEMC_LIBRARY NAMES libsystemc.a systemc libSnpsVP.so
+                HINTS ${SYSTEMC_HOME}/lib-${SYSTEMC_TARGET_ARCH}
+                    ${SYSTEMC_HOME}/lib
+                    ${SYSTEMC_HOME}/libso-gcc-6.2.0-64
+                    ${SYSTEMC_HOME}/libso-gcc-5.2.0-64)
+
+ENDIF()
+
 
 set(SYSTEMC_VERSION "")
 set(SYSTEMC_LIBRARIES ${SYSTEMC_LIBRARY})
@@ -55,7 +64,6 @@ if(EXISTS ${SYSTEMC_INCLUDE_DIR}/tlm/)
 endif()
 
 set(_sysc_ver_file "${SYSTEMC_INCLUDE_DIR}/sysc/kernel/sc_ver.h")
-
 if(EXISTS ${_sysc_ver_file})
     file(STRINGS ${_sysc_ver_file}  _systemc_ver REGEX
          "^#[\t ]*define[\t ]+SC_VERSION_(MAJOR|MINOR|PATCH)[\t ]+([0-9]+)$")

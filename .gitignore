@@ -15,4 +15,6 @@ setup.sh
 .project
 .cproject
 .settings/
+.DS_Store
+.vscode/
 

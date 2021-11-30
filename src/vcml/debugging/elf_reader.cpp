@@ -18,7 +18,7 @@
 
 #include <unistd.h>
 #include <fcntl.h>
-#include <libelf.h>
+#include <libelf/libelf.h>
 
 #include "vcml/debugging/elf_reader.h"
 

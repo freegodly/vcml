@@ -17,8 +17,9 @@
  ##############################################################################
 
 find_path(LIBELF_INCLUDE_DIRS NAMES "libelf.h"
-          HINTS $ENV{LIBELF_HOME}/include /usr/include)
-
+          HINTS $ENV{LIBELF_HOME}/include/libelf $ENV{LIBELF_HOME}/include /usr/include)
+message(${LIBELF_INCLUDE_DIRS})
+set(LIBELF_INCLUDE_DIRS $ENV{LIBELF_HOME}/include)
 find_library(LIBELF_LIBRARIES NAMES elf "libelf.a"
              HINTS $ENV{LIBELF_HOME}/lib /usr/lib /lib)
 

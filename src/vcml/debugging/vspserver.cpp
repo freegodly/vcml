@@ -221,7 +221,7 @@ namespace vcml { namespace debugging {
         stringstream ss(args[1]);
         u64 t; ss >> t;
 
-        sc_time quantum(t, SC_NS);
+        sc_time quantum((double)t, SC_NS);
         tlm::tlm_global_quantum::instance().set(quantum);
 
         return "OK";

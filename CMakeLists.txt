@@ -20,8 +20,25 @@ cmake_minimum_required(VERSION 3.8)
 project(vcml VERSION 2020.09.27 LANGUAGES C CXX)
 
 option(VCML_BUILD_TESTS "Build unit tests" OFF)
-option(VCML_BUILD_UTILS "Build utility programs" ON)
+option(VCML_BUILD_UTILS "Build utility programs" OFF)
 option(VCML_BUILD_PIC   "Build position independent code" ON)
+
+
+IF (APPLE)
+    set(LIBELF_ROOT /usr/local/Cellar/libelf/0.8.13_1)
+    set(SYSTEMC_ROOT /usr/local/systemc)
+ENDIF()
+
+
+if(NOT DEFINED ENV{SYSTEMC_HOME})
+    set(ENV{SYSTEMC_HOME} ${SYSTEMC_ROOT})
+endif()
+
+if(NOT DEFINED ENV{LIBELF_HOME})
+    set(ENV{LIBELF_HOME} ${LIBELF_ROOT})
+endif()
+
+set(CMAKE_CXX_STANDARD 20)
 
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
 find_package(SystemC "2.3.0" REQUIRED)
@@ -142,7 +159,7 @@ set(sources
 
 add_library(vcml ${sources})
 set_target_properties(vcml PROPERTIES DEBUG_POSTFIX "d")
-target_compile_features(vcml PUBLIC cxx_std_11)
+# target_compile_features(vcml PUBLIC cxx_std_11)
 target_compile_definitions(vcml PUBLIC $<$<CONFIG:DEBUG>:VCML_DEBUG>)
 
 target_include_directories(vcml PUBLIC ${inc})

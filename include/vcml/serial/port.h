@@ -18,7 +18,7 @@
 
 #ifndef VCML_SERIAL_PORT_H
 #define VCML_SERIAL_PORT_H
-
+#include <array>
 #include "vcml/common/types.h"
 #include "vcml/common/report.h"
 #include "vcml/common/strings.h"

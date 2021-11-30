@@ -29,6 +29,11 @@
 #include "vcml/logging/logger.h"
 #include "vcml/serial/backend.h"
 
+#if defined(__linux__)
+#else 
+    typedef void (*sighandler_t)(int);
+#endif
+
 namespace vcml { namespace serial {
 
     class backend_term: public backend

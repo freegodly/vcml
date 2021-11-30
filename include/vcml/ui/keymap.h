@@ -23,7 +23,11 @@
 #include "vcml/common/report.h"
 #include "vcml/logging/logger.h"
 
-#include <linux/input.h>
+#if defined(__linux__)
+    #include <linux/input.h>
+#else
+    #include "input-event-codes.h"
+#endif
 
 namespace vcml { namespace ui {
 

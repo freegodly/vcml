@@ -129,7 +129,7 @@ namespace vcml { namespace debugging {
             vector<u8> buffer(bufsz);
 
             while (size > 0) {
-                u64 nbytes = min(buffer.size(), size);
+                u64 nbytes = min(buffer.size(), (size_t)size);
                 file.read((char*)buffer.data(), nbytes);
                 VCML_REPORT_ON(!file, "cannot read file");
                 copy_image(buffer.data(), nbytes, offset);

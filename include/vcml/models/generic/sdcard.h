@@ -34,7 +34,7 @@ namespace vcml { namespace generic {
     private:
         bool    m_spi;
         bool    m_do_crc;
-        size_t  m_blklen;
+        u32  m_blklen;
         fstream m_image;
 
         u32     m_status;  // Card Status Register
