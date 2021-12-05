@@ -204,7 +204,7 @@ else()
     message(STATUS "Building without SLIRP support")
 endif()
 
-install(TARGETS vcml DESTINATION lib-$ENV{TARGET_ARCH})
+install(TARGETS vcml DESTINATION lib)
 install(DIRECTORY ${inc}/ DESTINATION include)
 install(DIRECTORY ${gen}/ DESTINATION include)
 

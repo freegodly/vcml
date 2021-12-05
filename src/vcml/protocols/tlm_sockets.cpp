@@ -250,12 +250,12 @@ namespace vcml {
 
     void tlm_target_socket::b_transport(tlm_generic_payload& tx, sc_time& dt) {
         m_parent->trace_fw(*this, tx, dt);
-
-        if (tx_size(tx) > get_bus_width() / 8) {
-            tx.set_response_status(TLM_BURST_ERROR_RESPONSE);
-            m_parent->trace_bw(*this, tx, dt);
-            return;
-        }
+        // chenge this for send to any size data for once recive
+        // if (tx_size(tx) > get_bus_width() / 8) {
+        //     tx.set_response_status(TLM_BURST_ERROR_RESPONSE);
+        //     m_parent->trace_bw(*this, tx, dt);
+        //     return;
+        // }
 
         int self = m_next++;
         while (self != m_curr)
