@@ -16,7 +16,7 @@
  *                                                                            *
  ******************************************************************************/
 
-#include "vcml/net/client_slirp.h"
+#include "vcml/net/backend_slirp.h"
 
 #include <poll.h>
 
@@ -62,7 +62,7 @@ namespace vcml { namespace net {
             request.events |= POLLHUP;
 
         vector<pollfd>* requests = (vector<pollfd>*)opaque;
-        requests->push_back(std::move(request));
+        requests->push_back(request);
         return requests->size() - 1;
     }
 
@@ -132,10 +132,29 @@ namespace vcml { namespace net {
         /* notify             = */ slirp_notify,
     };
 
+    void slirp_network::slirp_thread() {
+        while (m_running) {
+            unsigned int timeout = 10; // ms
+            vector<pollfd> fds;
+
+            slirp_pollfds_fill(m_slirp, &timeout, &slirp_add_poll_fd, &fds);
+            if (fds.empty()) {
+                usleep(timeout * 1000);
+                continue;
+            }
+
+            int ret = poll(fds.data(), fds.size(), timeout);
+            if (ret != 0)
+                slirp_pollfds_poll(m_slirp, ret < 0, &slirp_get_events, &fds);
+        }
+    }
+
     slirp_network::slirp_network(unsigned int id):
         m_config(),
         m_slirp(),
-        m_clients() {
+        m_clients(),
+        m_running(true),
+        m_thread() {
         m_config.version = 1;
 
         m_config.in_enabled  = true;
@@ -171,25 +190,21 @@ namespace vcml { namespace net {
             log_debug("created slirp ipv4 network 10.0.%u.0/24", id);
         if (m_config.in6_enabled)
             log_debug("created slirp ipv6 network %04x::", 0xfec0 + id);
+
+        m_thread = thread(std::bind(&slirp_network::slirp_thread, this));
+        set_thread_name(m_thread, mkstr("slirp_thread_%u", id));
     }
 
     slirp_network::~slirp_network() {
+        m_running = false;
+        if (m_thread.joinable())
+            m_thread.join();
+
         for (auto client : m_clients)
             client->disconnect();
+
         if (m_slirp)
             slirp_cleanup(m_slirp);
-    }
-
-    void slirp_network::poll() {
-        u32 timeout = 0;
-        vector<pollfd> events;
-        slirp_pollfds_fill(m_slirp, &timeout, slirp_add_poll_fd, &events);
-        if (events.empty())
-            return;
-
-        int ret = ::poll(events.data(), events.size(), 0);
-        if (ret != 0)
-            slirp_pollfds_poll(m_slirp, ret < 0, slirp_get_events, &events);
     }
 
     void slirp_network::send_packet(const u8* ptr, size_t len) {
@@ -202,50 +217,33 @@ namespace vcml { namespace net {
         slirp_input(m_slirp, ptr, len);
     }
 
-    void slirp_network::register_client(client_slirp* client) {
+    void slirp_network::register_client(backend_slirp* client) {
         m_clients.insert(client);
     }
 
-    void slirp_network::unregister_client(client_slirp* client) {
+    void slirp_network::unregister_client(backend_slirp* client) {
         m_clients.erase(client);
     }
 
-    client_slirp::client_slirp(const string& adapter,
+    backend_slirp::backend_slirp(const string& adapter,
         const shared_ptr<slirp_network>& network):
-        client(adapter),
-        m_network(network),
-        m_packets() {
+        backend(adapter),
+        m_network(network) {
         VCML_ERROR_ON(!m_network, "no network");
         m_network->register_client(this);
     }
 
-    client_slirp::~client_slirp() {
+    backend_slirp::~backend_slirp() {
         if (m_network)
             m_network->unregister_client(this);
     }
 
-    void client_slirp::queue_packet(shared_ptr<vector<u8>> packet) {
-        m_packets.push(std::move(packet));
-    }
-
-    bool client_slirp::recv_packet(vector<u8>& packet) {
-        if (m_packets.empty() && m_network)
-            m_network->poll();
-
-        if (m_packets.empty())
-            return false;
-
-        packet = *m_packets.front().get();
-        m_packets.pop();
-        return true;
-    }
-
-    void client_slirp::send_packet(const vector<u8>& packet) {
+    void backend_slirp::send_packet(const vector<u8>& packet) {
         if (m_network)
             m_network->recv_packet(packet.data(), packet.size());
     }
 
-    client* client_slirp::create(const string& adapter, const string& type) {
+    backend* backend_slirp::create(const string& adapter, const string& type) {
         unsigned int netid = 0;
         if (sscanf(type.c_str(), "slirp:%u", &netid) != 1)
             netid = 0;
@@ -254,7 +252,7 @@ namespace vcml { namespace net {
         auto& network = networks[netid];
         if (network == nullptr)
             network = std::make_shared<slirp_network>(netid);
-        return new client_slirp(adapter, network);
+        return new backend_slirp(adapter, network);
     }
 
 }}

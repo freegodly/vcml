@@ -1,6 +1,6 @@
 /******************************************************************************
  *                                                                            *
- * Copyright 2018 Jan Henrik Weinstock                                        *
+ * Copyright 2021 Jan Henrik Weinstock                                        *
  *                                                                            *
  * Licensed under the Apache License, Version 2.0 (the "License");            *
  * you may not use this file except in compliance with the License.           *
@@ -16,57 +16,20 @@
  *                                                                            *
  ******************************************************************************/
 
-#ifndef VCML_OPENCORES_OMPIC_H
-#define VCML_OPENCORES_OMPIC_H
+#ifndef VCML_AIO_H
+#define VCML_AIO_H
 
 #include "vcml/common/types.h"
 #include "vcml/common/report.h"
-#include "vcml/common/systemc.h"
-#include "vcml/common/range.h"
+#include "vcml/common/utils.h"
 
-#include "vcml/protocols/tlm.h"
-#include "vcml/protocols/irq.h"
+namespace vcml {
 
-#include "vcml/ports.h"
-#include "vcml/peripheral.h"
+    typedef function<void(int)> aio_handler;
 
-namespace vcml { namespace opencores {
+    void aio_notify(int fd, aio_handler handler);
+    void aio_cancel(int fd);
 
-    class ompic: public peripheral
-    {
-    private:
-        unsigned int m_num_cores;
-
-        u32* m_control;
-        u32* m_status;
-
-        u32 read_STATUS(size_t core_idx);
-        u32 read_CONTROL(size_t core_idx);
-
-        u32 write_CONTROL(u32 val, size_t core_idx);
-
-        // Disabled
-        ompic();
-        ompic(const ompic&);
-
-    public:
-        enum control_bits {
-            CTRL_IRQ_GEN = 1 << 30,
-            CTRL_IRQ_ACK = 1 << 31
-        };
-
-        reg<u32>** CONTROL;
-        reg<u32>** STATUS;
-
-        irq_initiator_socket_array<> IRQ;
-        tlm_target_socket IN;
-
-        ompic(const sc_core::sc_module_name& name, unsigned int num_cores);
-        virtual ~ompic();
-
-        VCML_KIND(ompic);
-    };
-
-}}
+}
 
 #endif

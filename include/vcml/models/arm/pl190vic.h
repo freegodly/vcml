@@ -25,6 +25,7 @@
 #include "vcml/common/range.h"
 
 #include "vcml/protocols/tlm.h"
+#include "vcml/protocols/irq.h"
 
 #include "vcml/ports.h"
 #include "vcml/peripheral.h"
@@ -36,7 +37,7 @@
 
 namespace vcml { namespace arm {
 
-    class pl190vic: public peripheral
+    class pl190vic: public peripheral, public irq_target
     {
     private:
         u32  m_ext_irq;
@@ -44,14 +45,13 @@ namespace vcml { namespace arm {
         bool m_vect_int;
 
         void update();
-        void irq_handler(unsigned int irq);
 
         u32 write_INTE(u32 val);
         u32 write_IECR(u32 val);
         u32 write_SINT(u32 val);
         u32 write_SICR(u32 val);
         u32 write_ADDR(u32 val);
-        u32 write_VCTRL(u32 val, unsigned int idx);
+        u32 write_VCTRL(u32 val, size_t idx);
 
     public:
         enum vctrl_bits {
@@ -60,36 +60,37 @@ namespace vcml { namespace arm {
             VCTRL_M        = 0x3f,
         };
 
-        reg<pl190vic, u32> IRQS; // IRQ Status register
-        reg<pl190vic, u32> FIQS; // FIQ Status register
-        reg<pl190vic, u32> RISR; // Raw Interrupt Status register
-        reg<pl190vic, u32> INTS; // Interrupt Select register
-        reg<pl190vic, u32> INTE; // Interrupt Enable register
-        reg<pl190vic, u32> IECR; // Interrupt Enable Clear register
-        reg<pl190vic, u32> SINT; // Software Interrupt register
-        reg<pl190vic, u32> SICR; // Software Interrupt Clear register
-        reg<pl190vic, u32> PROT; // Protection register
-        reg<pl190vic, u32> ADDR; // Vector Address register
-        reg<pl190vic, u32> DEFA; // Default Vector Address register
+        reg<u32> IRQS; // IRQ Status register
+        reg<u32> FIQS; // FIQ Status register
+        reg<u32> RISR; // Raw Interrupt Status register
+        reg<u32> INTS; // Interrupt Select register
+        reg<u32> INTE; // Interrupt Enable register
+        reg<u32> IECR; // Interrupt Enable Clear register
+        reg<u32> SINT; // Software Interrupt register
+        reg<u32> SICR; // Software Interrupt Clear register
+        reg<u32> PROT; // Protection register
+        reg<u32> ADDR; // Vector Address register
+        reg<u32> DEFA; // Default Vector Address register
 
-        reg<pl190vic, u32, VCML_ARM_PL190VIC_NVEC> VADDR; // Vector Addresses
-        reg<pl190vic, u32, VCML_ARM_PL190VIC_NVEC> VCTRL; // Vector Controls
+        reg<u32, VCML_ARM_PL190VIC_NVEC> VADDR; // Vector Addresses
+        reg<u32, VCML_ARM_PL190VIC_NVEC> VCTRL; // Vector Controls
 
-        reg<pl190vic, u32, 4> PID; // Peripheral ID registers
-        reg<pl190vic, u32, 4> CID; // Cell ID registers
+        reg<u32, 4> PID; // Peripheral ID registers
+        reg<u32, 4> CID; // Cell ID registers
 
-        tlm_target_socket  IN;
+        tlm_target_socket IN;
 
-        in_port_list<bool>  IRQ_IN;
-        out_port_list<bool> IRQ_OUT;
-        out_port_list<bool> FIQ_OUT;
+        irq_target_socket_array<VCML_ARM_PL190VIC_NIRQ> IRQ_IN;
+        irq_initiator_socket_array<> IRQ_OUT;
+        irq_initiator_socket_array<> FIQ_OUT;
 
         pl190vic(const sc_module_name& nm);
         virtual ~pl190vic();
         VCML_KIND(arm::pl190vic);
 
         virtual void reset() override;
-        virtual void end_of_elaboration() override;
+        virtual void irq_transport(const irq_target_socket& socket,
+                                   irq_payload& irq) override;
     };
 
 }}

@@ -89,7 +89,7 @@ namespace vcml { namespace serial {
         m_backends(),
         m_listeners(),
         backends("backends", "") {
-        module* host = dynamic_cast<module*>(hierarchy_top());
+        module* host = hierarchy_search<module>();
         VCML_ERROR_ON(!host, "serial port declared outside module");
         m_name = host->name();
 
@@ -135,13 +135,6 @@ namespace vcml { namespace serial {
         if (!stl_contains(m_listeners, b))
             VCML_ERROR("attempt to detach unknown backend");
         stl_remove_erase(m_listeners, b);
-    }
-
-    bool port::serial_peek() {
-        for (backend* b : m_listeners)
-            if (b->peek())
-                return true;
-        return false;
     }
 
     int port::create_backend(const string& type) {

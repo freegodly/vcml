@@ -24,7 +24,9 @@
 #include "vcml/common/systemc.h"
 
 #include "vcml/properties/property.h"
+
 #include "vcml/protocols/tlm.h"
+#include "vcml/protocols/irq.h"
 #include "vcml/protocols/spi.h"
 
 #include "vcml/ports.h"
@@ -52,14 +54,13 @@ namespace vcml { namespace opencores {
             STATUS_TXR = 1 << 1, /* transfer ready */
         };
 
-        reg<ocspi, u8> RXDATA;
-        reg<ocspi, u8> TXDATA;
-        reg<ocspi, u8> STATUS;
-        reg<ocspi, u32> CONTROL;
-        reg<ocspi, u32> BAUDDIV;
+        reg<u8> RXDATA;
+        reg<u8> TXDATA;
+        reg<u8> STATUS;
+        reg<u32> CONTROL;
+        reg<u32> BAUDDIV;
 
-        out_port<bool> IRQ;
-
+        irq_initiator_socket IRQ;
         tlm_target_socket IN;
         spi_initiator_socket SPI_OUT;
 

@@ -71,8 +71,8 @@ class pci_test_device: public generic::pci_device
 {
 public:
     pci_target_socket PCI_IN;
-    reg<pci_test_device, u32> TEST_REG;
-    reg<pci_test_device, u32> TEST_REG_IO;
+    reg<u32> TEST_REG;
+    reg<u32> TEST_REG_IO;
 
     u32 write_TEST_REG_IO(u32 val) {
         if (val == 0x1234)
@@ -91,7 +91,7 @@ public:
         TEST_REG.sync_always();
         TEST_REG_IO.allow_read_write();
         TEST_REG_IO.sync_always();
-        TEST_REG_IO.write = &pci_test_device::write_TEST_REG_IO;
+        TEST_REG_IO.on_write(&pci_test_device::write_TEST_REG_IO);
         pci_declare_bar(0, MMAP_PCI_MMIO_SIZE, PCI_BAR_MMIO | PCI_BAR_64);
         pci_declare_bar(2, MMAP_PCI_IO_SIZE, PCI_BAR_IO);
         pci_declare_pm_cap(PCI_PM_CAP_VER_1_1);
@@ -113,12 +113,10 @@ public:
     tlm_initiator_socket IO;
     tlm_target_socket MSI;
 
-    sc_signal<bool> IRQ[4];
-
-    sc_in<bool> INT_A;
-    sc_in<bool> INT_B;
-    sc_in<bool> INT_C;
-    sc_in<bool> INT_D;
+    irq_target_socket INT_A;
+    irq_target_socket INT_B;
+    irq_target_socket INT_C;
+    irq_target_socket INT_D;
 
     u64 msi_addr;
     u32 msi_data;
@@ -143,7 +141,6 @@ public:
         MMIO("MMIO"),
         IO("IO"),
         MSI("MSI"),
-        IRQ(),
         INT_A("INT_A"),
         INT_B("INT_B"),
         INT_C("INT_C"),
@@ -170,15 +167,10 @@ public:
         IO_BUS.bind(IO);
         IO_BUS.bind(PCI_ROOT.IO_IN[0], MMAP_PCI_IO, MMAP_PCI_IO_ADDR);
 
-        PCI_ROOT.IRQ_A.bind(IRQ[0]);
-        PCI_ROOT.IRQ_B.bind(IRQ[1]);
-        PCI_ROOT.IRQ_C.bind(IRQ[2]);
-        PCI_ROOT.IRQ_D.bind(IRQ[3]);
-
-        INT_A.bind(IRQ[0]);
-        INT_B.bind(IRQ[1]);
-        INT_C.bind(IRQ[2]);
-        INT_D.bind(IRQ[3]);
+        PCI_ROOT.IRQ_A.bind(INT_A);
+        PCI_ROOT.IRQ_B.bind(INT_B);
+        PCI_ROOT.IRQ_C.bind(INT_C);
+        PCI_ROOT.IRQ_D.bind(INT_D);
 
         MMIO_BUS.CLOCK.stub(100 * MHz);
         IO_BUS.CLOCK.stub(100 * MHz);

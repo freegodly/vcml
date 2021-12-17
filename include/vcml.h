@@ -29,6 +29,7 @@
 #include "vcml/common/socket.h"
 #include "vcml/common/systemc.h"
 #include "vcml/common/range.h"
+#include "vcml/common/aio.h"
 
 #include "vcml/logging/logger.h"
 #include "vcml/logging/log_file.h"
@@ -56,7 +57,7 @@
 #include "vcml/serial/backend.h"
 #include "vcml/serial/port.h"
 
-#include "vcml/net/client.h"
+#include "vcml/net/backend.h"
 #include "vcml/net/adapter.h"
 
 #include "vcml/ui/keymap.h"

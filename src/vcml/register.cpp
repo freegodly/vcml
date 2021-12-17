@@ -21,14 +21,19 @@
 
 namespace vcml {
 
+    int reg_base::current_cpu() const {
+        return m_host->current_cpu();
+    }
+
     reg_base::reg_base(address_space a, const char* nm, u64 addr, u64 size):
         sc_object(nm),
         m_range(addr, addr + size - 1),
         m_access(VCML_ACCESS_READ_WRITE),
         m_rsync(false),
         m_wsync(false),
-        m_host(dynamic_cast<peripheral*>(hierarchy_top())),
-        as(a) {
+        m_host(hierarchy_search<peripheral>()),
+        as(a),
+        tag() {
         VCML_ERROR_ON(!m_host, "register '%s' declared outside peripheral", nm);
         m_host->add_register(this);
     }

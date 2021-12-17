@@ -25,19 +25,19 @@
 
 #include "vcml/properties/property.h"
 
-#include "vcml/net/client.h"
+#include "vcml/net/backend.h"
 
 namespace vcml { namespace net {
 
-    class client;
+    class backend;
 
     class adapter
     {
     private:
         string m_name;
         size_t m_next_id;
-        std::map<size_t, client*> m_clients;
-        vector<client*> m_listener;
+        std::map<size_t, backend*> m_clients;
+        vector<backend*> m_listener;
 
         bool cmd_create_client(const vector<string>& args, ostream& os);
         bool cmd_destroy_client(const vector<string>& args, ostream& os);
@@ -46,15 +46,15 @@ namespace vcml { namespace net {
         static unordered_map<string, adapter*> s_adapters;
 
     public:
-        property<string> clients;
+        property<string> backends;
 
         const char* adapter_name() const { return m_name.c_str(); }
 
         adapter();
         virtual ~adapter();
 
-        void attach(client* client);
-        void detach(client* client);
+        void attach(backend* client);
+        void detach(backend* client);
 
         int  create_client(const string& type);
         bool destroy_client(int id);

@@ -21,10 +21,12 @@
 
 #include <signal.h>
 #include <termios.h>
+#include <fcntl.h>
 
 #include "vcml/common/types.h"
 #include "vcml/common/utils.h"
 #include "vcml/common/report.h"
+#include "vcml/common/aio.h"
 
 #include "vcml/logging/logger.h"
 #include "vcml/serial/backend.h"
@@ -39,6 +41,9 @@ namespace vcml { namespace serial {
     class backend_term: public backend
     {
     private:
+        mutex m_fifo_mtx;
+        queue<u8> m_fifo;
+
         int m_signal;
         bool m_exit;
         bool m_stopped;
@@ -61,7 +66,6 @@ namespace vcml { namespace serial {
         backend_term(const string& port);
         virtual ~backend_term();
 
-        virtual bool peek() override;
         virtual bool read(u8& val) override;
         virtual void write(u8 val) override;
 

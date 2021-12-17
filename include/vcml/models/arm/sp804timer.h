@@ -25,6 +25,7 @@
 #include "vcml/common/range.h"
 
 #include "vcml/protocols/tlm.h"
+#include "vcml/protocols/irq.h"
 
 #include "vcml/ports.h"
 #include "vcml/peripheral.h"
@@ -53,6 +54,7 @@ namespace vcml { namespace arm {
             sc_event    m_ev;
             sc_time     m_prev;
             sc_time     m_next;
+            sp804timer* m_timer;
 
             void trigger();
             void schedule(u32 ticks);
@@ -81,15 +83,15 @@ namespace vcml { namespace arm {
                 CTLR_PRESCALE_M = 3,
             };
 
-            reg<timer, u32> LOAD;    // Load register
-            reg<timer, u32> VALUE;   // Current Value register
-            reg<timer, u32> CONTROL; // Timer Control register
-            reg<timer, u32> INTCLR;  // Interrupt Clear register
-            reg<timer, u32> RIS;     // Raw Interrupt Status register
-            reg<timer, u32> MIS;     // Masked Interrupt Status register
-            reg<timer, u32> BGLOAD;  // Background Load register
+            reg<u32> LOAD;    // Load register
+            reg<u32> VALUE;   // Current Value register
+            reg<u32> CONTROL; // Timer Control register
+            reg<u32> INTCLR;  // Interrupt Clear register
+            reg<u32> RIS;     // Raw Interrupt Status register
+            reg<u32> MIS;     // Masked Interrupt Status register
+            reg<u32> BGLOAD;  // Background Load register
 
-            out_port<bool> IRQ;
+            irq_initiator_socket IRQ;
 
             bool is_enabled()     const { return CONTROL & CONTROL_ENABLED; }
             bool is_irq_enabled() const { return CONTROL & CONTROL_IRQEN; }
@@ -117,17 +119,17 @@ namespace vcml { namespace arm {
         timer TIMER1;
         timer TIMER2;
 
-        reg<sp804timer, u32> ITCR;   // Integration Test Control Register
-        reg<sp804timer, u32> ITOP;   // Integration Test OutPut set register
+        reg<u32> ITCR;   // Integration Test Control Register
+        reg<u32> ITOP;   // Integration Test OutPut set register
 
-        reg<sp804timer, u32, 4> PID; // Peripheral ID Register
-        reg<sp804timer, u32, 4> CID; // Cell ID Register
+        reg<u32, 4> PID; // Peripheral ID Register
+        reg<u32, 4> CID; // Cell ID Register
 
         tlm_target_socket IN;
 
-        sc_out<bool>   IRQ1;
-        sc_out<bool>   IRQ2;
-        out_port<bool> IRQC;
+        irq_base_initiator_socket IRQ1;
+        irq_base_initiator_socket IRQ2;
+        irq_initiator_socket IRQC;
 
         sp804timer(const sc_module_name& nm);
         virtual ~sp804timer();

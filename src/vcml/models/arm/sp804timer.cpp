@@ -23,14 +23,15 @@ namespace vcml { namespace arm {
     void sp804timer::timer::trigger() {
         IRQ = false;
 
-        if (!is_enabled())
-            return;
+        if (is_enabled()) {
+            if (is_irq_enabled())
+                IRQ = true;
 
-        if (is_irq_enabled())
-            IRQ = true;
+            if (!is_oneshot())
+                schedule(is_periodic() ? LOAD : 0xFFFFFFFF);
+        }
 
-        if (!is_oneshot())
-            schedule(is_periodic() ? LOAD : 0xFFFFFFFF);
+        m_timer->update_IRQC();
     }
 
     void sp804timer::timer::schedule(u32 ticks) {
@@ -83,6 +84,7 @@ namespace vcml { namespace arm {
 
     u32 sp804timer::timer::write_INTCLR(u32 val) {
         IRQ = false;
+        m_timer->update_IRQC();
         return 0;
     }
 
@@ -97,6 +99,7 @@ namespace vcml { namespace arm {
         m_ev("event"),
         m_prev(SC_ZERO_TIME),
         m_next(SC_ZERO_TIME),
+        m_timer(dynamic_cast<sp804timer*>(get_parent_object())),
         LOAD("LOAD", 0x00, 0x00000000),
         VALUE("VALUE", 0x04, 0xFFFFFFFF),
         CONTROL("CONTROL", 0x08, 0x00000020),
@@ -108,31 +111,31 @@ namespace vcml { namespace arm {
 
         LOAD.sync_always();
         LOAD.allow_read_write();
-        LOAD.write = &timer::write_LOAD;
+        LOAD.on_write(&timer::write_LOAD);
 
         VALUE.sync_always();
         VALUE.allow_read_only();
-        VALUE.read = &timer::read_VALUE;
+        VALUE.on_read(&timer::read_VALUE);
 
         CONTROL.sync_always();
         CONTROL.allow_read_write();
-        CONTROL.write = &timer::write_CONTROL;
+        CONTROL.on_write(&timer::write_CONTROL);
 
         INTCLR.sync_always();
         INTCLR.allow_write_only();
-        INTCLR.write = &timer::write_INTCLR;
+        INTCLR.on_write(&timer::write_INTCLR);
 
         RIS.sync_always();
         RIS.allow_read_only();
-        RIS.read = &timer::read_RIS;
+        RIS.on_read(&timer::read_RIS);
 
         MIS.sync_always();
         MIS.allow_read_only();
-        MIS.read = &timer::read_MIS;
+        MIS.on_read(&timer::read_MIS);
 
         BGLOAD.sync_always();
         BGLOAD.allow_read_write();
-        BGLOAD.write = &timer::write_BGLOAD;
+        BGLOAD.on_write(&timer::write_BGLOAD);
 
         SC_METHOD(trigger);
         sensitive << m_ev;
@@ -149,7 +152,7 @@ namespace vcml { namespace arm {
     }
 
     void sp804timer::update_IRQC() {
-        IRQC = IRQ1.read() || IRQ2.read();
+        IRQC = TIMER1.IRQ || TIMER2.IRQ;
     }
 
     sp804timer::sp804timer(const sc_module_name& nm):
@@ -185,12 +188,6 @@ namespace vcml { namespace arm {
 
         TIMER1.RESET.bind(RESET);
         TIMER2.RESET.bind(RESET);
-
-        SC_METHOD(update_IRQC);
-        sensitive << IRQ1 << IRQ2;
-        dont_initialize();
-
-        reset();
     }
 
     sp804timer::~sp804timer() {

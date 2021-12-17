@@ -63,6 +63,7 @@ set(sources
     ${src}/vcml/common/utils.cpp
     ${src}/vcml/common/strings.cpp
     ${src}/vcml/common/version.cpp
+    ${src}/vcml/common/aio.cpp
     ${src}/vcml/common/thctl.cpp
     ${src}/vcml/common/bitops.cpp
     ${src}/vcml/common/socket.cpp
@@ -92,9 +93,9 @@ set(sources
     ${src}/vcml/serial/backend_term.cpp
     ${src}/vcml/serial/backend.cpp
     ${src}/vcml/serial/port.cpp
-    ${src}/vcml/net/client.cpp
-    ${src}/vcml/net/client_file.cpp
-    ${src}/vcml/net/client_tap.cpp
+    ${src}/vcml/net/backend.cpp
+    ${src}/vcml/net/backend_file.cpp
+    ${src}/vcml/net/backend_tap.cpp
     ${src}/vcml/net/adapter.cpp
     ${src}/vcml/ui/fbmode.cpp
     ${src}/vcml/ui/keymap.cpp
@@ -107,6 +108,7 @@ set(sources
     ${src}/vcml/protocols/tlm_stubs.cpp
     ${src}/vcml/protocols/tlm_host.cpp
     ${src}/vcml/protocols/tlm_sockets.cpp
+    ${src}/vcml/protocols/tlm_memory.cpp
     ${src}/vcml/protocols/irq.cpp
     ${src}/vcml/protocols/spi.cpp
     ${src}/vcml/protocols/sd.cpp
@@ -198,7 +200,7 @@ if(LIBSLIRP_FOUND)
     message(STATUS "Building with SLIRP support")
     target_compile_definitions(vcml PRIVATE HAVE_LIBSLIRP)
     target_include_directories(vcml SYSTEM PRIVATE ${LIBSLIRP_INCLUDE_DIRS})
-    target_sources(vcml PRIVATE ${src}/vcml/net/client_slirp.cpp)
+    target_sources(vcml PRIVATE ${src}/vcml/net/backend_slirp.cpp)
     target_link_libraries(vcml PUBLIC ${LIBSLIRP_LIBRARIES})
 else()
     message(STATUS "Building without SLIRP support")

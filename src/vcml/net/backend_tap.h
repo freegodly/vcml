@@ -16,47 +16,33 @@
  *                                                                            *
  ******************************************************************************/
 
-#include "vcml/net/client_file.h"
+#ifndef VCML_NET_BACKEND_TAP_H
+#define VCML_NET_BACKEND_TAP_H
+
+#include "vcml/common/types.h"
+#include "vcml/common/report.h"
+#include "vcml/common/aio.h"
+#include "vcml/logging/logger.h"
+#include "vcml/net/backend.h"
 
 namespace vcml { namespace net {
 
-    client_file::client_file(const string& adapter, const string& tx):
-        client(adapter),
-        m_count(0),
-        m_tx(tx) {
-        if (!m_tx.good())
-            log_warn("failed to open file '%s'", tx.c_str());
-        m_type = mkstr("file:%s", tx.c_str());
-    }
+    class backend_tap: public backend
+    {
+    private:
+        int m_fd;
 
-    client_file::~client_file() {
-        // nothing to do
-    }
+        void close_tap();
 
-    bool client_file::recv_packet(vector<u8>& packet) {
-        return false;
-    }
+    public:
+        backend_tap(const string& adapter, int devno);
+        virtual ~backend_tap();
 
-    void client_file::send_packet(const vector<u8>& packet) {
-        m_tx << "[" << sc_time_stamp() << "] packet #" << ++m_count << ", "
-             << packet.size() << " bytes";
+        virtual void send_packet(const vector<u8>& packet) override;
 
-        for (size_t i = 0; i < packet.size(); i++) {
-            m_tx << (i % 25 ? " " : "\n")
-                 << std::hex << std::setw(2) << std::setfill('0')
-                 << (int)packet[i] << std::dec;
-        }
-
-        m_tx << std::endl << std::endl;
-    }
-
-    client* client_file::create(const string& adapter, const string& type) {
-        string tx = adapter + ".tx";
-        vector<string> args = split(type, ':');
-        if (args.size() > 1)
-            tx = args[1];
-
-        return new client_file(adapter, tx);
-    }
+        static backend* create(const string& name, const string& type);
+    };
 
 }}
+
+#endif

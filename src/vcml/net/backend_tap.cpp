@@ -28,10 +28,33 @@
 #include <fcntl.h>
 #include <errno.h>
 
+#include "vcml/net/backend_tap.h"
+
+#define ETH_MAX_FRAME_SIZE 1522
+
 namespace vcml { namespace net {
 
-    client_tap::client_tap(const string& adapter, int devno):
-        client(adapter) {
+    static void tap_read(int fd, shared_ptr<vector<u8>>& packet) {
+        size_t len;
+        packet->resize(ETH_MAX_FRAME_SIZE);
+
+        do {
+            len = read(fd, packet->data(), packet->size());
+        } while (len < 0 && errno == EINTR);
+
+        packet->resize(len);
+    }
+
+    void backend_tap::close_tap() {
+        if (m_fd >= 0) {
+            aio_cancel(m_fd);
+            close(m_fd);
+            m_fd = -1;
+        }
+    }
+
+    backend_tap::backend_tap(const string& adapter, int devno):
+        backend(adapter) {
         m_fd = open("/dev/net/tun", O_RDWR);
         VCML_REPORT_ON(m_fd < 0, "error opening tundev: %s", strerror(errno));
 
@@ -45,51 +68,34 @@ namespace vcml { namespace net {
         log_info("using tap device %s", ifr.ifr_name);
 
         m_type = mkstr("tap:%d", devno);
+
+        aio_notify(m_fd, [&](int fd) -> void {
+            auto packet = std::make_shared<vector<u8>>();
+            tap_read(fd, packet);
+            if (packet->empty()) {
+                log_error("error reading tap device: %s", strerror(errno));
+                close_tap();
+                return;
+            }
+
+            queue_packet(packet);
+        });
     }
 
-    client_tap::~client_tap() {
-        if (m_fd >= 0)
-            close(m_fd);
+    backend_tap::~backend_tap() {
+        close_tap();
     }
 
-    bool client_tap::recv_packet(vector<u8>& packet) {
-        if (m_fd < 0)
-            return false;
-
-        if (!fd_peek(m_fd))
-            return false;
-
-        ssize_t len;
-        packet.resize(ETH_MAX_FRAME_SIZE);
-
-        do {
-            len = ::read(m_fd, packet.data(), packet.size());
-        } while (len < 0 && errno == EINTR);
-
-        if (len < 0) {
-            log_error("error reading tap device: %s", strerror(errno));
-            close(m_fd);
-            m_fd = -1;
-        }
-
-        if (len <= 0)
-            return false;
-
-        packet.resize(len);
-        return true;
-    }
-
-    void client_tap::send_packet(const vector<u8>& packet) {
+    void backend_tap::send_packet(const vector<u8>& packet) {
         if (m_fd >= 0)
             fd_write(m_fd, packet.data(), packet.size());
     }
 
-    client* client_tap::create(const string& adapter, const string& type) {
-        int devno = 0;
-        vector<string> args = split(type, ':');
-        if (args.size() > 1)
-            devno = from_string<int>(args[1]);
-        return new client_tap(adapter, devno);
+    backend* backend_tap::create(const string& adapter, const string& type) {
+        unsigned int devno = 0;
+        if (sscanf(type.c_str(), "tap:%u", &devno) != 1)
+            devno = 0;
+        return new backend_tap(adapter, devno);
     }
 
 }}

@@ -16,60 +16,32 @@
  *                                                                            *
  ******************************************************************************/
 
-#ifndef VCML_NET_CLIENT_SLIRP_H
-#define VCML_NET_CLIENT_SLIRP_H
+#ifndef VCML_NET_BACKEND_FILE_H
+#define VCML_NET_BACKEND_FILE_H
 
 #include "vcml/common/types.h"
 #include "vcml/common/report.h"
+#include "vcml/common/strings.h"
+#include "vcml/common/systemc.h"
 #include "vcml/logging/logger.h"
-#include "vcml/net/client.h"
-
-#include <libslirp.h>
-#include <libslirp-version.h>
+#include "vcml/net/backend.h"
 
 namespace vcml { namespace net {
 
-    class client_slirp;
-
-    class slirp_network
+    class backend_file: public backend
     {
     private:
-        SlirpConfig m_config;
-        Slirp* m_slirp;
-
-        set<client_slirp*> m_clients;
+        size_t m_count;
+        ofstream m_tx;
 
     public:
-        slirp_network(unsigned int id);
-        virtual ~slirp_network();
-
-        void poll();
-
-        void send_packet(const u8* ptr, size_t len);
-        void recv_packet(const u8* ptr, size_t len);
-
-        void register_client(client_slirp* client);
-        void unregister_client(client_slirp* client);
-    };
-
-    class client_slirp: public client
-    {
-    private:
-        shared_ptr<slirp_network> m_network;
-        queue<shared_ptr<vector<u8>>> m_packets;
-
-    public:
-        client_slirp(const string& ada, const shared_ptr<slirp_network>& net);
-        virtual ~client_slirp();
-
-        void disconnect() { m_network = nullptr; }
-
-        void queue_packet(shared_ptr<vector<u8>> packet);
+        backend_file(const string& adapter, const string& tx);
+        virtual ~backend_file();
 
         virtual bool recv_packet(vector<u8>& packet) override;
         virtual void send_packet(const vector<u8>& packet) override;
 
-        static client* create(const string& adapter, const string& type);
+        static backend* create(const string& adapter, const string& type);
     };
 
 }}

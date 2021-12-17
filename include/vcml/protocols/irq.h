@@ -20,7 +20,10 @@
 #define VCML_PROTOCOLS_IRQ_H
 
 #include "vcml/common/types.h"
+#include "vcml/common/report.h"
 #include "vcml/common/systemc.h"
+
+#include "vcml/ports.h"
 #include "vcml/module.h"
 
 namespace vcml {
@@ -98,55 +101,70 @@ namespace vcml {
         irq_bw_transport_if, 0, sc_core::SC_ONE_OR_MORE_BOUND>
         irq_base_target_socket_b;
 
-    class irq_base_initiator_socket : public irq_base_initiator_socket_b
+    class irq_base_initiator_socket: public irq_base_initiator_socket_b
     {
-    public:
-        irq_base_initiator_socket(const char* nm):
-            irq_base_initiator_socket_b(nm) {
-        }
+    private:
+        irq_target_stub* m_stub;
 
-        virtual ~irq_base_initiator_socket() = default;
+    public:
+        irq_base_initiator_socket(const char*, address_space = VCML_AS_DEFAULT);
+        virtual ~irq_base_initiator_socket();
         VCML_KIND(irq_base_initiator_socket);
 
         virtual sc_core::sc_type_index get_protocol_types() const {
             return typeid(irq_bw_transport_if);
         }
+
+        bool is_stubbed() const { return m_stub != nullptr; }
+        void stub();
     };
 
-    class irq_base_target_socket : public irq_base_target_socket_b
+    class irq_base_target_socket: public irq_base_target_socket_b
     {
-    public:
-        irq_base_target_socket(const char* nm):
-            irq_base_target_socket_b(nm) {
-        }
+    private:
+        irq_initiator_stub* m_stub;
 
-        virtual ~irq_base_target_socket() = default;
+    public:
+        const address_space as;
+
+        irq_base_target_socket(const char*, address_space = VCML_AS_DEFAULT);
+        virtual ~irq_base_target_socket();
         VCML_KIND(irq_base_target_socket);
 
         virtual sc_core::sc_type_index get_protocol_types() const {
             return typeid(irq_fw_transport_if);
         }
+
+        bool is_stubbed() const { return m_stub != nullptr; }
+        void stub();
     };
+
+    template <const size_t MAX = SIZE_MAX>
+    using irq_base_initiator_socket_array =
+        socket_array<irq_base_initiator_socket, MAX>;
+
+    template <const size_t MAX = SIZE_MAX>
+    using irq_base_target_socket_array =
+        socket_array<irq_base_target_socket, MAX>;
 
     class irq_initiator_socket: public irq_base_initiator_socket
     {
     public:
-        struct irq_state_tracker {
+        struct irq_state_tracker : irq_payload {
             irq_initiator_socket* parent;
-            irq_vector vector;
-            bool active;
             bool operator = (bool state);
+            operator bool () const { return active; }
         };
 
-        bool is_stubbed() const { return m_stub != nullptr; }
-
-        irq_initiator_socket(const char* name);
+        irq_initiator_socket(const char* n, address_space a = VCML_AS_DEFAULT);
         virtual ~irq_initiator_socket();
         VCML_KIND(irq_initiator_socket);
-        void stub();
 
-        void interrupt(bool state = true, irq_vector vector = IRQ_NO_VECTOR);
-        void interrupt(irq_payload& irq);
+        const sc_event& default_event();
+
+        bool read(irq_vector vector = IRQ_NO_VECTOR) const;
+        operator bool () const { return read(IRQ_NO_VECTOR); }
+        void write(bool state, irq_vector vector = IRQ_NO_VECTOR);
 
         void raise_irq(irq_vector vector = IRQ_NO_VECTOR);
         void lower_irq(irq_vector vector = IRQ_NO_VECTOR);
@@ -157,8 +175,8 @@ namespace vcml {
     private:
         module* m_parent;
         irq_target* m_host;
-        irq_target_stub* m_stub;
         unordered_map<irq_vector, irq_state_tracker> m_state;
+        sc_event* m_event;
 
         struct irq_bw_transport : public irq_bw_transport_if {
             irq_initiator_socket* socket;
@@ -166,22 +184,27 @@ namespace vcml {
                 irq_bw_transport_if(), socket(s) {
             }
         } m_transport;
+
+        void irq_transport(irq_payload& irq);
     };
 
     class irq_target_socket: public irq_base_target_socket
     {
     public:
-        const address_space as;
-        bool is_stubbed() const { return m_stub != nullptr; }
         irq_target_socket(const char* nm, address_space as = VCML_AS_DEFAULT);
         virtual ~irq_target_socket();
         VCML_KIND(irq_target_socket);
-        void stub();
+
+        const sc_event& default_event();
+
+        bool read(irq_vector vector = IRQ_NO_VECTOR) const;
+        operator bool () const { return read(IRQ_NO_VECTOR); }
 
     private:
         module* m_parent;
         irq_target* m_host;
-        irq_initiator_stub* m_stub;
+        unordered_map<irq_vector, bool> m_state;
+        sc_event* m_event;
 
         struct irq_fw_transport : public irq_fw_transport_if {
             irq_target_socket* socket;
@@ -208,7 +231,7 @@ namespace vcml {
     public:
         irq_initiator_socket IRQ_OUT;
         irq_initiator_stub(const sc_module_name& name);
-        virtual ~irq_initiator_stub();
+        virtual ~irq_initiator_stub() = default;
         VCML_KIND(irq_initiator_stub);
     };
 
@@ -220,8 +243,35 @@ namespace vcml {
     public:
         irq_target_socket IRQ_IN;
         irq_target_stub(const sc_module_name& name);
-        virtual ~irq_target_stub();
+        virtual ~irq_target_stub() = default;
         VCML_KIND(irq_target_stub);
+    };
+
+    class irq_initiator_adapter: public module
+    {
+    public:
+        in_port<bool> IRQ_IN;
+        irq_initiator_socket IRQ_OUT;
+
+        irq_initiator_adapter(const sc_module_name& nm);
+        virtual ~irq_initiator_adapter() = default;
+
+    private:
+        void update();
+    };
+
+    class irq_target_adapter: public module, public irq_target
+    {
+    public:
+        irq_target_socket IRQ_IN;
+        out_port<bool> IRQ_OUT;
+
+        irq_target_adapter(const sc_module_name& nm);
+        virtual ~irq_target_adapter() = default;
+
+    private:
+        virtual void irq_transport(const irq_target_socket& socket,
+                                   irq_payload& irq) override;
     };
 
 }

@@ -16,34 +16,41 @@
  *                                                                            *
  ******************************************************************************/
 
-#ifndef VCML_NET_BACKEND_FILE_H
-#define VCML_NET_BACKEND_FILE_H
+#include <gtest/gtest.h>
+using namespace ::testing;
 
-#include "vcml/common/types.h"
-#include "vcml/common/report.h"
-#include "vcml/common/strings.h"
-#include "vcml/common/systemc.h"
-#include "vcml/logging/logger.h"
-#include "vcml/net/client.h"
+#include "vcml.h"
 
-namespace vcml { namespace net {
+TEST(aio, callback) {
+    const char msg = 'X';
 
-    class client_file: public client
-    {
-    private:
-        size_t m_count;
-        ofstream m_tx;
+    int fds[2];
+    EXPECT_EQ(pipe(fds), 0);
 
-    public:
-        client_file(const string& adapter, const string& tx);
-        virtual ~client_file();
+    std::mutex mtx; mtx.lock();
+    std::condition_variable_any cv;
+    std::atomic<int> count(0);
 
-        virtual bool recv_packet(vector<u8>& packet) override;
-        virtual void send_packet(const vector<u8>& packet) override;
+    vcml::aio_notify(fds[0], [&](int fd)-> void {
+        char buf;
+        EXPECT_EQ(fd, fds[0]) << "wrong file descriptor passed to handler";
+        EXPECT_EQ(read(fd, &buf, 1), 1) << "cannot read file descriptor";
+        EXPECT_EQ(buf, msg) << "read incorrect data";
 
-        static client* create(const string& adapter, const string& type);
-    };
+        count++;
+        cv.notify_all();
+    });
 
-}}
+    EXPECT_EQ(write(fds[1], &msg, 1), 1);
 
-#endif
+    cv.wait(mtx);
+    ASSERT_EQ(count, 1) << "handler called multiple times, should be once";
+
+    vcml::aio_cancel(fds[0]);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    EXPECT_EQ(count, 1) << "handler after being cancelled";
+
+    close(fds[0]);
+    close(fds[1]);
+}

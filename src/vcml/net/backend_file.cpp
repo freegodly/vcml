@@ -16,35 +16,47 @@
  *                                                                            *
  ******************************************************************************/
 
-#ifndef VCML_NET_CLIENT_TAP_H
-#define VCML_NET_CLIENT_TAP_H
-
-#include "vcml/common/types.h"
-#include "vcml/common/report.h"
-#include "vcml/logging/logger.h"
-#include "vcml/net/client.h"
+#include "vcml/net/backend_file.h"
 
 namespace vcml { namespace net {
 
-    class client_tap: public client
-    {
-    private:
-        int m_fd;
+    backend_file::backend_file(const string& adapter, const string& tx):
+        backend(adapter),
+        m_count(0),
+        m_tx(tx) {
+        if (!m_tx.good())
+            log_warn("failed to open file '%s'", tx.c_str());
+        m_type = mkstr("file:%s", tx.c_str());
+    }
 
-        enum : size_t {
-            ETH_MAX_FRAME_SIZE = 1522,
-        };
+    backend_file::~backend_file() {
+        // nothing to do
+    }
 
-    public:
-        client_tap(const string& adapter, int devno);
-        virtual ~client_tap();
+    bool backend_file::recv_packet(vector<u8>& packet) {
+        return false;
+    }
 
-        virtual bool recv_packet(vector<u8>& packet) override;
-        virtual void send_packet(const vector<u8>& packet) override;
+    void backend_file::send_packet(const vector<u8>& packet) {
+        m_tx << "[" << sc_time_stamp() << "] packet #" << ++m_count << ", "
+             << packet.size() << " bytes";
 
-        static client* create(const string& name, const string& type);
-    };
+        for (size_t i = 0; i < packet.size(); i++) {
+            m_tx << (i % 25 ? " " : "\n")
+                 << std::hex << std::setw(2) << std::setfill('0')
+                 << (int)packet[i] << std::dec;
+        }
+
+        m_tx << std::endl << std::endl;
+    }
+
+    backend* backend_file::create(const string& adapter, const string& type) {
+        string tx = adapter + ".tx";
+        vector<string> args = split(type, ':');
+        if (args.size() > 1)
+            tx = args[1];
+
+        return new backend_file(adapter, tx);
+    }
 
 }}
-
-#endif

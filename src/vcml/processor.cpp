@@ -32,10 +32,10 @@ namespace vcml {
 
         os << "Interrupts:" << std::endl;
         in_port_list<bool>::iterator it;
-        for (it = IRQ.begin(); it != IRQ.end(); it++) {
+        for (auto it : IRQ) {
             irq_stats stats;
-            if (get_irq_stats(it->first, stats)) {
-                os << "  IRQ" << it->first << ": ";
+            if (get_irq_stats(it.first, stats)) {
+                os << "  IRQ" << it.first << ": ";
 
                 if (!stats.irq_count) {
                     os << "no events" << std::endl;
@@ -220,8 +220,15 @@ namespace vcml {
 
                 unsigned int num_cycles = 1;
                 sc_time quantum = tlm_global_quantum::instance().get();
-                if (quantum > clock_cycle() && quantum > local_time())
-                    num_cycles = (quantum - local_time()) / clock_cycle();
+                if (quantum > clock_cycle() && quantum > local_time()) {
+                    sc_time time_left = quantum - local_time();
+                    num_cycles = time_left / clock_cycle();
+
+                    // if there will be less than one clock_cycle left
+                    // in the current quantum -> do one more instruction
+                    if (time_left % clock_cycle() != SC_ZERO_TIME)
+                        ++num_cycles;
+                }
 
                 if (is_stepping())
                     num_cycles = 1;
@@ -243,35 +250,11 @@ namespace vcml {
         }
     }
 
-    void processor::irq_handler(unsigned int irq) {
-        irq_stats& stats = m_irq_stats[irq];
-        bool irq_up = IRQ[irq].read();
-
-        if (irq_up == stats.irq_status) {
-            log_warn("irq %d already %s", irq, irq_up ? "set" : "cleared");
-            return;
-        }
-
-        stats.irq_status = irq_up;
-
-        if (irq_up) {
-            stats.irq_count++;
-            stats.irq_last = sc_time_stamp();
-        } else {
-            sc_time delta = sc_time_stamp() - stats.irq_last;
-            if (delta > stats.irq_longest)
-                stats.irq_longest = delta;
-            stats.irq_uptime += delta;
-        }
-
-        log_debug("%sing IRQ %u", irq_up ? "sett" : "clear", irq);
-        interrupt(irq, irq_up);
-    }
-
     SC_HAS_PROCESS(processor);
 
     processor::processor(const sc_module_name& nm, const string& cpuarch):
         component(nm),
+        irq_target(),
         target(),
         m_run_time(0),
         m_cycle_count(0),
@@ -355,10 +338,10 @@ namespace vcml {
         return true;
     }
 
-    void processor::log_bus_error(const tlm_initiator_socket& socket, vcml_access acs,
-                                  tlm_response_status rs, u64 addr, u64 size) {
+    void processor::log_bus_error(const tlm_initiator_socket& socket,
+        vcml_access rwx, tlm_response_status rs, u64 addr, u64 size) {
         string op;
-        switch (acs) {
+        switch (rwx) {
         case VCML_ACCESS_READ  : op = (&socket == &INSN) ? "fetch"
                                                          : "read"; break;
         case VCML_ACCESS_WRITE : op = "write"; break;
@@ -376,6 +359,38 @@ namespace vcml {
         log_debug("  code = %s", status.c_str());
     }
 
+    void processor::irq_transport(const irq_target_socket& socket,
+        irq_payload& tx) {
+
+        unsigned int irq = IRQ.index_of(socket);
+        irq_stats& stats = m_irq_stats[irq];
+
+
+        if (tx.active == stats.irq_status) {
+            log_warn("irq %d already %s", irq, tx.active ? "set" : "cleared");
+            return;
+        }
+
+        stats.irq_status = tx.active;
+
+        if (tx.active) {
+            stats.irq_count++;
+            stats.irq_last = sc_time_stamp();
+        } else {
+            sc_time delta = sc_time_stamp() - stats.irq_last;
+            if (delta > stats.irq_longest)
+                stats.irq_longest = delta;
+            stats.irq_uptime += delta;
+        }
+
+        log_debug("%sing IRQ %u", tx.active ? "sett" : "clear", irq);
+        interrupt(irq, tx.active, tx.vector);
+    }
+
+    void processor::interrupt(unsigned int irq, bool set, irq_vector vector) {
+        interrupt(irq, set);
+    }
+
     void processor::interrupt(unsigned int irq, bool set) {
         // to be overloaded
     }
@@ -389,20 +404,10 @@ namespace vcml {
 
     void processor::end_of_elaboration() {
         for (auto it : IRQ) {
-            std::stringstream ss;
-            ss << "irq_handler_" << it.first;
-
-            sc_spawn_options opts;
-            opts.spawn_method();
-            opts.set_sensitivity(it.second);
-            opts.dont_initialize();
-            sc_spawn(sc_bind(&processor::irq_handler, this, it.first),
-                     sc_gen_unique_name(ss.str().c_str()), &opts);
-
             irq_stats& stats = m_irq_stats[it.first];
             stats.irq = it.first;
             stats.irq_count = 0;
-            stats.irq_status = (*it.second)->read();
+            stats.irq_status = false;
             stats.irq_last = SC_ZERO_TIME;
             stats.irq_uptime = SC_ZERO_TIME;
             stats.irq_longest = SC_ZERO_TIME;

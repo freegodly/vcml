@@ -1,6 +1,6 @@
 /******************************************************************************
  *                                                                            *
- * Copyright 2018 Jan Henrik Weinstock                                        *
+ * Copyright 2021 Jan Henrik Weinstock                                        *
  *                                                                            *
  * Licensed under the Apache License, Version 2.0 (the "License");            *
  * you may not use this file except in compliance with the License.           *
@@ -16,55 +16,59 @@
  *                                                                            *
  ******************************************************************************/
 
-#ifndef VCML_OPENCORES_OMPIC_H
-#define VCML_OPENCORES_OMPIC_H
+#ifndef VCML_NET_BACKEND_SLIRP_H
+#define VCML_NET_BACKEND_SLIRP_H
 
 #include "vcml/common/types.h"
 #include "vcml/common/report.h"
-#include "vcml/common/systemc.h"
-#include "vcml/common/range.h"
+#include "vcml/logging/logger.h"
+#include "vcml/net/backend.h"
 
-#include "vcml/protocols/tlm.h"
-#include "vcml/protocols/irq.h"
+#include <libslirp.h>
+#include <libslirp-version.h>
 
-#include "vcml/ports.h"
-#include "vcml/peripheral.h"
+namespace vcml { namespace net {
 
-namespace vcml { namespace opencores {
+    class backend_slirp;
 
-    class ompic: public peripheral
+    class slirp_network
     {
     private:
-        unsigned int m_num_cores;
+        SlirpConfig m_config;
+        Slirp* m_slirp;
 
-        u32* m_control;
-        u32* m_status;
+        set<backend_slirp*> m_clients;
 
-        u32 read_STATUS(size_t core_idx);
-        u32 read_CONTROL(size_t core_idx);
+        atomic<bool> m_running;
+        thread m_thread;
 
-        u32 write_CONTROL(u32 val, size_t core_idx);
-
-        // Disabled
-        ompic();
-        ompic(const ompic&);
+        void slirp_thread();
 
     public:
-        enum control_bits {
-            CTRL_IRQ_GEN = 1 << 30,
-            CTRL_IRQ_ACK = 1 << 31
-        };
+        slirp_network(unsigned int id);
+        virtual ~slirp_network();
 
-        reg<u32>** CONTROL;
-        reg<u32>** STATUS;
+        void send_packet(const u8* ptr, size_t len);
+        void recv_packet(const u8* ptr, size_t len);
 
-        irq_initiator_socket_array<> IRQ;
-        tlm_target_socket IN;
+        void register_client(backend_slirp* client);
+        void unregister_client(backend_slirp* client);
+    };
 
-        ompic(const sc_core::sc_module_name& name, unsigned int num_cores);
-        virtual ~ompic();
+    class backend_slirp: public backend
+    {
+    private:
+        shared_ptr<slirp_network> m_network;
 
-        VCML_KIND(ompic);
+    public:
+        backend_slirp(const string& ada, const shared_ptr<slirp_network>& net);
+        virtual ~backend_slirp();
+
+        void disconnect() { m_network = nullptr; }
+
+        virtual void send_packet(const vector<u8>& packet) override;
+
+        static backend* create(const string& adapter, const string& type);
     };
 
 }}

@@ -153,14 +153,33 @@ namespace vcml {
     sc_module* hierarchy_pop();
     sc_module* hierarchy_top();
 
+    template <typename MODULE = sc_core::sc_object>
+    inline MODULE* hierarchy_search(sc_object* start = nullptr) {
+        if (start == nullptr)
+            start = hierarchy_top();
+
+        for (sc_object* obj = start; obj; obj = obj->get_parent_object()) {
+            MODULE* module = dynamic_cast<MODULE*>(obj);
+            if (module)
+                return module;
+        }
+
+        return nullptr;
+    }
+
     class hierarchy_guard
     {
     private:
         sc_module* m_owner;
 
     public:
-        hierarchy_guard(sc_module* owner): m_owner(owner) {
-            hierarchy_push(owner);
+        hierarchy_guard(sc_module* owner):
+            m_owner(owner ? owner : hierarchy_top()) {
+            hierarchy_push(m_owner);
+        }
+
+        hierarchy_guard(sc_object* obj):
+            hierarchy_guard(hierarchy_search<sc_module>(obj)) {
         }
 
         ~hierarchy_guard() {
@@ -277,6 +296,9 @@ namespace vcml {
 
     bool kernel_has_phase_callbacks();
 
+    void on_end_of_elaboration(function<void(void)> callback);
+    void on_start_of_simulation(function<void(void)> callback);
+
     void on_each_delta_cycle(function<void(void)> callback);
     void on_each_time_step(function<void(void)> callback);
 
@@ -379,7 +401,7 @@ namespace vcml {
         SOCKET& operator[] (size_t idx) { return lookup(idx); }
         const SOCKET& operator[] (size_t idx) const {
             VCML_ERROR_ON(!exists(idx), "socket %zu not found", idx);
-            return *m_sockets[idx];
+            return *m_sockets.at(idx);
         }
 
         const char* name() { return m_name.c_str(); }

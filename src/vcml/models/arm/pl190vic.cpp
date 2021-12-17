@@ -44,18 +44,6 @@ namespace vcml { namespace arm {
         }
     }
 
-    void pl190vic::irq_handler(unsigned int irq) {
-        if (IRQ_IN[irq].read()) {
-            m_ext_irq = m_ext_irq | (1 << irq);
-            log_debug("setting IRQ %d", irq);
-        } else {
-            m_ext_irq = m_ext_irq & ~(1 << irq);
-            log_debug("cleared IRQ %d", irq);
-        }
-
-        update();
-    }
-
     u32 pl190vic::write_INTE(u32 val) {
         INTE |= val; // set hardware interrupt
         update();
@@ -91,7 +79,7 @@ namespace vcml { namespace arm {
         return VADDR;
     }
 
-    u32 pl190vic::write_VCTRL(u32 val, unsigned int idx) {
+    u32 pl190vic::write_VCTRL(u32 val, size_t idx) {
         return val & VCTRL_M;
     }
 
@@ -127,33 +115,31 @@ namespace vcml { namespace arm {
         INTS.allow_read_write();
 
         INTE.allow_read_write();
-        INTE.write = &pl190vic::write_INTE;
+        INTE.on_write(&pl190vic::write_INTE);
 
         IECR.allow_read_write();
-        IECR.write = &pl190vic::write_IECR;
+        IECR.on_write(&pl190vic::write_IECR);
 
         SINT.allow_read_write();
-        SINT.write = &pl190vic::write_SINT;
+        SINT.on_write(&pl190vic::write_SINT);
 
         SICR.allow_write_only();
-        SICR.write = &pl190vic::write_SICR;
+        SICR.on_write(&pl190vic::write_SICR);
 
         PROT.allow_read_write(); // not implemented
 
         ADDR.allow_read_write();
-        ADDR.write = &pl190vic::write_ADDR;
+        ADDR.on_write(&pl190vic::write_ADDR);
 
         DEFA.allow_read_write();
 
         VADDR.allow_read_write();
 
         VCTRL.allow_read_write();
-        VCTRL.tagged_write = &pl190vic::write_VCTRL;
+        VCTRL.on_write(&pl190vic::write_VCTRL);
 
         PID.allow_read_only();
         CID.allow_read_only();
-
-        reset();
     }
 
     pl190vic::~pl190vic() {
@@ -168,24 +154,20 @@ namespace vcml { namespace arm {
             CID[i] = (VCML_ARM_PL190VIC_CID >> (i * 8)) & 0xFF;
     }
 
-    void pl190vic::end_of_elaboration() {
-        for (auto irq : IRQ_IN) {
-            if (irq.first >= VCML_ARM_PL190VIC_NIRQ) {
-                VCML_ERROR("max number of connected IRQs (%d) exceeded",
-                           VCML_ARM_PL190VIC_NIRQ);
-            }
+    void pl190vic::irq_transport(const irq_target_socket& socket,
+        irq_payload& irq) {
+        unsigned int nirq = IRQ_IN.index_of(socket);
+        const u32 mask = 1 << nirq;
 
-            stringstream ss;
-            ss << "irq_handler_" << irq.first;
-
-            sc_spawn_options opts;
-            opts.spawn_method();
-            opts.set_sensitivity(irq.second);
-            opts.dont_initialize();
-
-            sc_spawn(sc_bind(&pl190vic::irq_handler, this, irq.first),
-                     sc_gen_unique_name(ss.str().c_str()), &opts);
+        if (irq.active) {
+            m_ext_irq |= mask;
+            log_debug("setting IRQ %u", nirq);
+        } else {
+            m_ext_irq &= ~mask;
+            log_debug("cleared IRQ %u", nirq);
         }
+
+        update();
     }
 
 }}

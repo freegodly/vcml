@@ -18,18 +18,17 @@
 
 #include "vcml/net/adapter.h"
 
-#include "vcml/net/client.h"
-#include "vcml/net/client_file.h"
-#include "vcml/net/client_tap.h"
+#include "vcml/net/backend.h"
+#include "vcml/net/backend_file.h"
+#include "vcml/net/backend_tap.h"
 
 #ifdef HAVE_LIBSLIRP
-#include "vcml/net/client_slirp.h"
+#include "vcml/net/backend_slirp.h"
 #endif
-
 
 namespace vcml { namespace net {
 
-    client::client(const string& adapter):
+    backend::backend(const string& adapter):
         m_adapter(adapter),
         m_type("unknown") {
         auto a = adapter::find(adapter);
@@ -37,35 +36,55 @@ namespace vcml { namespace net {
         a->attach(this);
     }
 
-    client::~client() {
+    backend::~backend() {
         adapter* a = adapter::find(m_adapter);
         if (a != nullptr)
             a->detach(this);
     }
 
-    client* client::create(const string& adapter, const string& type) {
+    void backend::queue_packet(shared_ptr<vector<u8>> packet) {
+        lock_guard<mutex> guard(m_packets_mtx);
+        m_packets.push(packet);
+    }
+
+    bool backend::recv_packet(vector<u8>& packet) {
+        if (m_packets.empty())
+            return false;
+
+        lock_guard<mutex> guard(m_packets_mtx);
+        shared_ptr<vector<u8>> top = m_packets.front();
+        m_packets.pop();
+
+        packet = *top.get();
+        return true;
+    }
+
+    void backend::send_packet(const vector<u8>& packet) {
+        // to be overloaded
+    }
+
+    backend* backend::create(const string& adapter, const string& type) {
         string kind = type.substr(0, type.find(":"));
-        typedef function<client*(const string&, const string&)> construct;
-        static const unordered_map<string, construct> clients = {
-            { "file", client_file::create },
-            { "tap", client_tap::create },
+        typedef function<backend*(const string&, const string&)> construct;
+        static const unordered_map<string, construct> backends = {
+            { "file", backend_file::create },
+            { "tap", backend_tap::create },
 #ifdef HAVE_LIBSLIRP
-            { "slirp", client_slirp::create },
+            { "slirp", backend_slirp::create },
 #endif
         };
 
-        auto it = clients.find(kind);
-        if (it == clients.end()) {
+        auto it = backends.find(kind);
+        if (it == backends.end()) {
             stringstream ss;
-            ss << "unknown network client '" << type << "'" << std::endl
-               << "the following network clients are known:" << std::endl;
-            for (auto avail : clients)
+            ss << "unknown network backend '" << type << "'" << std::endl
+               << "the following network backends are known:" << std::endl;
+            for (auto avail : backends)
                 ss << "  " << avail.first;
             VCML_REPORT("%s", ss.str().c_str());
         }
 
-        try
-        {
+        try {
             return it->second(adapter, type);
         } catch (std::exception& ex) {
             VCML_REPORT("%s: %s", type.c_str(), ex.what());
