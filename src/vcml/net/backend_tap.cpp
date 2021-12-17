@@ -16,7 +16,7 @@
  *                                                                            *
  ******************************************************************************/
 
-#include "vcml/net/client_tap.h"
+#include "vcml/net/backend_tap.h"
 #ifdef __linux__
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -28,7 +28,6 @@
 #include <fcntl.h>
 #include <errno.h>
 
-#include "vcml/net/backend_tap.h"
 
 #define ETH_MAX_FRAME_SIZE 1522
 
@@ -103,24 +102,29 @@ namespace vcml { namespace net {
 #else  // not linux not supported
 namespace vcml { namespace net {
 
-    client_tap::client_tap(const string& adapter, int devno):
-        client(adapter) {
-        log_error("tap devices are not supported on this platform");
+    static void tap_read(int fd, shared_ptr<vector<u8>>& packet) {
+       
     }
 
-    client_tap::~client_tap() { 
+    void backend_tap::close_tap() {
+        
     }
 
-    bool client_tap::recv_packet(vector<u8>& packet) {
-        log_error("not supported"); 
-        return false;
+    backend_tap::backend_tap(const string& adapter, int devno) :
+        backend(adapter){
+
     }
 
-    void client_tap::send_packet(const vector<u8>& packet) {    
+    backend_tap::~backend_tap() {
+        close_tap();
     }
 
-    client* client_tap::create(const string& adapter, const string& type) {
-        return new client_tap(adapter, 0);
+    void backend_tap::send_packet(const vector<u8>& packet) {
+       
+    }
+
+    backend* backend_tap::create(const string& adapter, const string& type) {
+       
     }
 
 }}

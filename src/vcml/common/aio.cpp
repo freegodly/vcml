@@ -104,14 +104,19 @@ namespace vcml {
             return singleton;
         }
     };
-#endif // __linux__
 
+#endif // __linux__
+    
     void aio_notify(int fd, aio_handler handler) {
+#ifdef __linux__
         aio::instance().notify(fd, handler);
+#endif
     }
 
     void aio_cancel(int fd) {
+#ifdef __linux__
         aio::instance().cancel(fd);
+#endif
     }
 
 }
