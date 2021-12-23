@@ -66,10 +66,10 @@ namespace vcml {
         static void report_unused();
     };
 
-    template <typename T>
-    inline void broker::define(const string& key, const T& value) {
-        define(key, to_string(value));
-    }
+    // template <typename T>
+    // inline void broker::define(const string& key, const T& value) {
+    //     define(key, to_string(value));
+    // }
 
     template <typename T>
     inline broker* broker::init(const string& key, T& value) {
