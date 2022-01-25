@@ -202,7 +202,8 @@ namespace vcml {
         // transactions can be arbitrarily wide; none debug transactions
         // must be split up if they are wider than socket bus width.
 
-        if (info.is_debug) {
+        //if (info.is_debug) {
+        if (true) {
             tx_setup(m_txd, cmd, addr, data, size);
             size = send(m_txd, info);
             tlm_response_status rs = m_txd.get_response_status();
